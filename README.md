@@ -108,9 +108,29 @@ The RTL is synthesizable (static array indices, no `$`-functions in the DUT).
 With [Yosys](https://yosyshq.net/yosys/):
 
 ```bash
-yosys -p "read_verilog -I rtl rtl/main_memory.v rtl/cache_controller.v; \
-          synth; stat" 
+yosys -q -p "read_verilog -I rtl rtl/cache_controller.v; \
+             synth -top cache_controller; stat"
 ```
 
-`stat` reports cell/FF/LUT counts (area proxy). For FPGA timing, run the same
-RTL through Vivado/Quartus and read the post-synthesis timing summary.
+### Results (Yosys 0.71, generic gate mapping)
+
+| Metric            | Count  |
+|-------------------|--------|
+| Cells (total)     | 30,237 |
+| Flip-flops (DFF)  | 9,862  |
+| AND / ANDNOT      | 14,796 |
+| NOR               | 4,788  |
+| MUX               | 85     |
+| Wires             | 20,321 |
+| Public wire bits  | 10,094 |
+
+**FF sanity check:** cache storage = 64 lines × (22 tag + 1 valid + 128 data)
+= 64 × 151 = **9,664 bits**, plus FSM / stat / request registers ≈ **9,862** —
+matches the DFF count. Most of the area is the cache array.
+
+Yosys warns `Replacing memory with list of registers` for `tag_ram`,
+`valid_ram`, `data_ram`: in a generic flow the arrays become flip-flops. On an
+FPGA/ASIC these map to **block RAM**, collapsing the gate count dramatically.
+For real NAND2-equivalent area, map to a standard-cell library (`abc` +
+liberty file); for FPGA timing, push the same RTL through Vivado/Quartus and
+read the post-synthesis timing summary.
