@@ -72,6 +72,23 @@ Optional waveform:
 gtkwave cache.vcd
 ```
 
+## Waveform
+
+First few accesses, captured from `cache.vcd` (sequential walk of `0x0, 0x4,
+0x8, 0xC, 0x10`):
+
+![Cache waveform](docs/waveform.png)
+
+- `0x0` is a **cold miss**: FSM goes `COMPARE → ALLOC`, `mem_req` pulses, and
+  after the memory latency `mem_ready` returns the block → `cpu_ready` + miss
+  counted.
+- `0x4`, `0x8`, `0xC` land in the **same 16-byte block** just refilled →
+  `hit_flag` asserts immediately in `COMPARE`, no memory access. This is
+  spatial locality visible on the wire.
+
+Regenerate with: `./run.sh && python3 tools/plot_wave.py cache.vcd docs/waveform.png`
+(or open `cache.vcd` in GTKWave).
+
 ## Results
 
 | Phase       | Accesses | Hits | Misses | Hit ratio | AMAT (cyc) | Locality tested |
