@@ -8,6 +8,7 @@
 | 2 | **Ved Pawar** | `2024NST-VP` | `ved.pawar2024@nst.rishihood.edu.in` | `vedpawar2254` |
 | 3 | **Khuswant Rajpurohit** | `2024NST-KR` | `khuswant.rajpurohit2024@nst.rishihood.edu.in` | `khuswantrajpurohit18@gmail.com` |
 | 4 | **Anshu Yadav** | `2024NST-AY` | `anshu.yadav2024@nst.rishihood.edu.in` | `anshuyadav9306@gmail.com` |
+| 5 | **Aditraj Pal** | `2401010042` | `adityaraj.pal2024@nst.rishihood.edu.in` | `AlgoAditya21` |
 
 *Modern Computer Architecture Project, Newton School of Technology (NST)*  
 *Department of Computer Science & Engineering, Rishihood University, India*  
@@ -212,6 +213,7 @@ The synthesized DFF count aligns with the theoretical register audit:
 | 2 | **Ved Pawar** | `2024NST-VP` | **Verification Lead & Backing Store Modeling** | • Designed and implemented the behavioral backing store memory model (`main_memory.v`) with multi-cycle latency handshake.<br>• Authored the initial testbench infrastructure (`tb_cache.v`) and signal declarations.<br>• Implemented real-time AMAT and hit/miss statistical computation tasks in simulation.<br>• Built the Python VCD waveform extraction script (`plot_wave.py`) for automated timing diagrams.<br>• Contributed to the Abstract, Literature Review, and Verification Analysis sections of the report. |
 | 3 | **Khuswant Rajpurohit** | `2024NST-KR` | **Benchmark Generation & Workload Analysis** | • Designed the memory access benchmark suites for spatial locality (sequential strides) and temporal locality (repeated working sets).<br>• Implemented the 32-bit xorshift pseudo-random address generator (shift triplet 13/17/5) in the testbench.<br>• Analyzed performance trade-offs, cache line thrashing, and conflict miss behavior under unbuffered memory loads.<br>• Co-authored the Experimental Results, Discussion, and Performance Tables. |
 | 4 | **Anshu Yadav** | `2024NST-AY` | **Documentation, Build Automation & LaTeX Typesetting** | • Structured and formatted the IEEE conference paper specification (`CacheController_IEEE_Report.tex`).<br>• Configured the build runner script (`run.sh`) and simulation automation pipeline.<br>• Compiled and validated the IEEE final publication PDF (`CacheController_IEEE_Report.pdf`).<br>• Curated project references, compiled repository documentation, and formatted comparative architectural tables. |
+| 5 | **Aditraj Pal** | `2401010042` | **Simulation Support & Results Validation** | • Assisted with testbench execution and regression runs across the three access-pattern benchmarks.<br>• Cross-verified reported hit/miss counts and AMAT values against raw simulation logs.<br>• Reviewed waveform traces and helped validate FSM state transitions during hit and refill paths.<br>• Contributed to proofreading and consistency checks across the report tables and sections. |
 
 ---
 
