@@ -3,6 +3,8 @@
 set -e
 cd "$(dirname "$0")"
 
+mkdir -p build
+
 echo ">> Compiling..."
 iverilog -g2012 -I rtl -o build/cache_sim \
     rtl/main_memory.v \
