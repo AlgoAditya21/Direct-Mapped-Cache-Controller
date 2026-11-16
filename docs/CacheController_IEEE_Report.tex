@@ -1,0 +1,150 @@
+\documentclass[conference]{IEEEtran}
+\usepackage{cite}
+\usepackage{amsmath}
+\usepackage{graphicx}
+\usepackage{textcomp}
+\usepackage{xcolor}
+\usepackage{array}
+\usepackage{booktabs}
+\usepackage{url}
+
+\begin{document}
+
+\title{Design and RTL Verification of a Direct-Mapped\\ Read-Only Cache Controller}
+
+\author{
+\IEEEauthorblockN{Khuswant Rajpurohit, Ved Pawar, Anshu Yadav, and Pushkar Jain}
+\IEEEauthorblockA{Modern Computer Architecture Project, Rishihood University, India\\
+\{khuswant.rajpurohit2024, ved.pawar2024, anshu.yadav2024, pushkar.jain2024\}@nst.rishihood.edu.in}
+}
+
+\maketitle
+
+\begin{abstract}
+This work presents a Verilog register-transfer-level design of a direct-mapped, read-only cache controller with a behavioral main-memory model. The cache is 1 kilobyte in size, uses 16-byte blocks, and maps 32-bit byte addresses onto 64 lines. Each access is decoded into a 22-bit tag, a 6-bit index, and a 4-bit offset. A three-state finite state machine controls the access flow: an idle state latches the request, a compare state tests the valid bit and tag, and an allocate state fetches a full block from memory on a miss and refills the line. The controller forwards the requested 32-bit word from the stored 128-bit block in both the hit and the refill paths. The design was simulated with Icarus Verilog using a self-contained testbench that drives three access patterns and reports hit ratio, miss ratio, and average memory access time. The sequential pattern reached a 0.750 hit ratio, the repeated pattern reached 0.900, and the random pattern reached 0.010, matching the expected behavior of spatial locality, temporal locality, and no locality. The register-transfer-level description was also synthesized with Yosys using a generic gate mapping. The work establishes functional correctness in simulation and basic synthesizability. Standard-cell area, power, and post-route timing are outside the verified scope.
+\end{abstract}
+
+\begin{IEEEkeywords}
+Cache memory, direct-mapped cache, memory hierarchy, average memory access time, spatial locality, temporal locality, Verilog HDL, RTL verification.
+\end{IEEEkeywords}
+
+\section{Introduction}
+A cache is a small, fast memory that holds a subset of main memory so that frequent accesses avoid the long latency of the backing store. Programs tend to reuse the same data in a short window of time, called temporal locality, and tend to access nearby addresses, called spatial locality. A cache exploits both. When a requested address is present, the access is a hit and completes quickly. When it is absent, the access is a miss and the cache must fetch the data from memory before it can respond.
+
+This project implements the simplest placement policy, direct mapping, in which each memory block has exactly one line where it may reside. The line is chosen by taking the block address modulo the number of lines. Direct mapping needs only one tag comparison per access, which keeps the hardware small and the hit path short, at the cost of conflict misses when two active blocks map to the same line.
+
+The design is read-only. It serves load requests, allocates a line on a miss, and never writes dirty data back to memory. This narrows the scope to the core lookup, comparison, and refill logic, which is the part most relevant to studying locality and access time. The work focuses on the register-transfer-level implementation and simulation-based functional verification rather than measured silicon or FPGA performance.
+
+\section{Problem Statement and Design Objectives}
+The project addresses the implementation of a cache controller that accepts a 32-bit byte address, determines whether the addressed word is resident, and either returns it in a single cycle or fetches the containing block from a slow memory before returning it. A correct design must decode the address into tag, index, and offset fields, compare the stored tag against the requested tag under a valid bit, select the correct word from a multi-word block, and maintain running access statistics.
+
+The primary objectives are: (1) decode a 32-bit address into the correct field widths for a 1 kilobyte, 16-byte-block, direct-mapped organization; (2) implement tag, valid, and data storage for 64 lines; (3) build a finite state machine that handles the hit path and the miss-then-refill path; (4) model a backing memory with a fixed access latency; (5) compute hit ratio, miss ratio, and average memory access time over defined access patterns; and (6) confirm that the register-transfer-level code is synthesizable.
+
+\section{Proposed Solution and Architecture}
+The cache is organized as 64 lines, each holding one 16-byte block. The size follows directly from the chosen parameters: a 1024-byte cache with 16-byte blocks has $1024/16 = 64$ lines. A block of 16 bytes holds four 32-bit words, so each data line stores 128 bits.
+
+The 32-bit address is split into three fields. The low 4 bits are the block offset, because $\log_2(16) = 4$ bits are needed to address a byte within a 16-byte block. The next 6 bits are the index, because $\log_2(64) = 6$ bits select one of the 64 lines. The remaining $32 - 6 - 4 = 22$ high bits are the tag, which uniquely identifies the block occupying a line. The layout is shown in Table~\ref{tab:addr}.
+
+\begin{table}[t]
+\caption{Address Field Breakdown (32-bit)}
+\label{tab:addr}
+\centering
+\begin{tabular}{@{}lll@{}}
+\toprule
+\textbf{Field} & \textbf{Bits} & \textbf{Purpose} \\
+\midrule
+Tag    & [31:10] (22) & Identifies the block in a line \\
+Index  & [9:4] (6)    & Selects one of 64 lines \\
+Offset & [3:0] (4)    & Byte within the 16-byte block \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The controller holds three parallel arrays indexed by the 6-bit index. The tag array stores the 22-bit tag of the block in each line, the valid array stores one bit per line indicating whether the line holds usable data, and the data array stores the 128-bit block. Entry $i$ of all three arrays together forms cache line $i$.
+
+On a request, the controller reads the valid bit and the stored tag at the requested index. The access is a hit when the valid bit is set and the stored tag equals the requested tag. Both conditions are required: the valid bit rules out lines that have never been filled, and the tag match rules out a different block that happens to map to the same line. On a hit, bits [3:2] of the offset select one of the four words in the block, and that 32-bit word is returned.
+
+On a miss, the controller asserts a request to the backing memory with the block-aligned address and waits. The memory returns the full 128-bit block after a fixed latency. The controller writes the block into the data array, writes the requested tag into the tag array, sets the valid bit, and returns the requested word. This policy allocates a line on every miss. A later access to any word of the same block is then a hit, which is how the design exploits spatial locality.
+
+\begin{equation}
+\text{AMAT} = \text{HIT\_TIME} + \text{miss\_ratio} \times \text{MISS\_PENALTY}
+\end{equation}
+
+The design is modular. A shared header file defines the widths and the address field ranges in one place so that the rest of the code uses symbolic slices instead of hard-coded bit positions. The controller file contains the storage, the address decoder, the comparator, and the state machine. The memory file contains the behavioral backing store. The testbench file drives the access patterns and reports the statistics.
+
+\section{RTL Implementation}
+The implementation is divided into three principal register-transfer-level components and one testbench.
+
+\textit{(A) Parameter header.} The header defines the address width as 32, the cache size as 1024 bytes, the block size as 16 bytes, the offset width as 4, the index width as 6, the tag width as 22, the number of lines as 64, and the block width as 128 bits. It also defines the address slices for offset, index, and tag so that both the controller and the memory decode addresses consistently. An include guard prevents duplicate definition when the header is pulled into more than one file.
+
+\textit{(B) Cache controller.} The controller declares three arrays of 64 entries each for tags, valid bits, and data. A combinational decoder slices the incoming address into its three fields. The request fields are latched into registers when a request is accepted, so that the state machine operates on a stable copy of the address across the several cycles a miss can take. A comparator produces the hit signal from the latched valid bit and the tag match. A small combinational function selects the correct 32-bit word from the 128-bit block based on the offset.
+
+\textit{(C) Finite state machine.} The controller uses three active states. The idle state waits for a request; on acceptance it latches the address fields, increments the access counter, and advances to the compare state. The compare state evaluates the hit condition. On a hit it increments the hit counter, returns the selected word, asserts the ready and hit signals for one cycle, and returns to idle. On a miss it increments the miss counter, issues a memory request, and advances to the allocate state. The allocate state waits for the memory to signal ready, then writes the data, tag, and valid arrays for the line, returns the selected word, and goes back to idle. The ready, hit, and memory-request signals default low each cycle so they act as single-cycle pulses. An asynchronous active-low reset clears all valid bits and the statistics counters so that no stale line is read as a hit after reset.
+
+\textit{(D) Behavioral main memory.} The memory model takes a latency parameter, set to 10 cycles by the testbench. On a request it counts down from the latency value, then pulses a ready signal for one cycle and drives the 128-bit block. The block contents are generated deterministically from the block number, so the testbench does not need to load an external file. Each 32-bit word of a block is the block number times four plus the word index, which makes every block unique and predictable.
+
+\section{Verification Methodology}
+Verification uses a self-contained testbench that issues read requests through a reusable task, waits for the ready signal, and records statistics. The testbench defines a hit time of 1 cycle and a miss penalty of 10 cycles, matching the memory latency. Each phase snapshots the counters before and after so that per-phase hit ratio, miss ratio, and average memory access time can be computed from the deltas.
+
+Three access patterns are driven. The sequential pattern walks 64 ascending word addresses, four words per block, which should produce one miss per block followed by three hits and demonstrate spatial locality. The repeated pattern hammers a small four-block working set 40 times in a memory region not touched by the sequential pass, so the first touch of each block is a genuine cold miss; it should produce four cold misses and then resident hits, demonstrating temporal locality. The random pattern applies 200 pseudo-random addresses generated by an xorshift sequence across a 64 kilobyte span, which should produce almost no reuse and a near-zero hit ratio, demonstrating that a cache gives no benefit without locality. A safety timeout ends the simulation if it ever fails to complete.
+
+The testbench also dumps all signals to a value-change-dump file. A small Python script parses that file and renders the first few accesses as a digital waveform, showing a cold miss followed by a refill and then hits in the same block. This makes the spatial-locality behavior visible on the wire.
+
+\section{Results and Discussion}
+The simulation reported per-phase statistics consistent with the expected locality behavior. Table~\ref{tab:results} summarizes the results. The sequential phase reached a 0.750 hit ratio, because four words share one 16-byte block, giving one cold miss and three hits per block. The repeated phase reached 0.900, because four cold misses are followed by a resident working set. The random phase reached 0.010, because scattered addresses with no reuse produce a cold or conflict miss on nearly every access. The random average memory access time of 10.90 cycles is close to the raw miss penalty, which confirms that the cache provides no benefit without locality.
+
+\begin{table}[t]
+\caption{Simulation Results by Access Pattern}
+\label{tab:results}
+\centering
+\begin{tabular}{@{}lccccc@{}}
+\toprule
+\textbf{Phase} & \textbf{Acc.} & \textbf{Hits} & \textbf{Hit ratio} & \textbf{AMAT} & \textbf{Locality} \\
+\midrule
+Sequential & 64  & 48 & 0.750 & 3.50  & Spatial \\
+Repeated   & 40  & 36 & 0.900 & 2.00  & Temporal \\
+Random     & 200 & 2  & 0.010 & 10.90 & None \\
+Overall    & 304 & 86 & 0.283 & 8.20  & Mixed \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+The register-transfer-level description was synthesized with Yosys using a generic gate mapping. Table~\ref{tab:synth} reports the cell and flip-flop counts. The flip-flop count matches a direct hand calculation of the storage: 64 lines times the per-line bit count of 22 tag bits plus 1 valid bit plus 128 data bits equals 9,664 bits, and the state machine, statistics, and request registers account for the remainder. Most of the area is the cache array.
+
+\begin{table}[t]
+\caption{Synthesis Results (Yosys, Generic Gate Mapping)}
+\label{tab:synth}
+\centering
+\begin{tabular}{@{}lr@{}}
+\toprule
+\textbf{Metric} & \textbf{Count} \\
+\midrule
+Cells (total)    & 30,237 \\
+Flip-flops (DFF) & 9,862 \\
+AND / ANDNOT     & 14,796 \\
+NOR              & 4,788 \\
+MUX              & 85 \\
+Wires            & 20,321 \\
+\bottomrule
+\end{tabular}
+\end{table}
+
+In a generic flow the storage arrays are mapped to flip-flops, which inflates the gate count. On an FPGA or an ASIC these arrays map instead to block RAM, which collapses the count. A standard-cell mapping against a liberty library would give a real gate-equivalent area; that step, along with timing, is left to future work.
+
+\section{Limitations and Future Work}
+The current prototype has the following limitations. First, the cache is read-only; it has no write path, no write-through or write-back policy, and no dirty-bit handling. Second, the mapping is direct, so two active blocks that share an index evict each other even when other lines are free. Third, the verification is simulation-based; no FPGA or ASIC synthesis timing, place-and-route, area, or power analysis is reported. Fourth, the backing memory is behavioral with a fixed latency rather than a model of real memory timing.
+
+Future work includes adding a write path with an explicit write-through or write-back policy and dirty bits, extending the placement to set-associative mapping with a replacement policy to reduce conflict misses, mapping the storage to block RAM and reading post-synthesis timing from an FPGA toolchain, and sweeping cache size and block size to study their effect on hit ratio and average memory access time.
+
+\section{Conclusion}
+This work presents a compact direct-mapped, read-only cache controller in Verilog with a behavioral main-memory model. The design decodes 32-bit addresses into tag, index, and offset fields, stores 64 lines of tag, valid, and 128-bit data, and uses a three-state finite state machine to serve hits in a single cycle and to fetch and refill a full block on a miss. Simulation across sequential, repeated, and random access patterns produced hit ratios of 0.750, 0.900, and 0.010, matching the expected effects of spatial locality, temporal locality, and no locality, and the measured average memory access times follow the stated model. The register-transfer-level code is synthesizable, with a flip-flop count that matches the hand-calculated storage. The project therefore provides a working register-transfer-level and verification prototype for studying cache lookup, locality, and access time. Claims about physical speed, area, and power remain future work pending synthesis timing and hardware evaluation.
+
+\begin{thebibliography}{1}
+\bibitem{patterson} D. A. Patterson and J. L. Hennessy, \textit{Computer Organization and Design: The Hardware/Software Interface}, 5th ed. Waltham, MA, USA: Morgan Kaufmann, 2013.
+\bibitem{hennessy} J. L. Hennessy and D. A. Patterson, \textit{Computer Architecture: A Quantitative Approach}, 6th ed. Cambridge, MA, USA: Morgan Kaufmann, 2017.
+\bibitem{smith} A. J. Smith, ``Cache Memories,'' \textit{ACM Comput. Surv.}, vol. 14, no. 3, pp. 473--530, Sep. 1982, doi: 10.1145/356887.356892.
+\bibitem{iverilog} S. Williams, ``Icarus Verilog,'' simulation tool. [Online]. Available: \url{http://iverilog.icarus.com/}
+\bibitem{yosys} C. Wolf, ``Yosys Open SYnthesis Suite.'' [Online]. Available: \url{https://yosyshq.net/yosys/}
+\end{thebibliography}
+
+\end{document}
