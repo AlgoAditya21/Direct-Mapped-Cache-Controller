@@ -152,7 +152,7 @@ The design was simulated using Icarus Verilog (`iverilog`) under a self-containe
 | :--- | :--- | :---: | :---: | :---: | :---: | :---: | :---: | :--- |
 | **Phase 1** | Sequential stride ($+4\text{ B}$) | 64 | 48 | 16 | **0.750** | **0.250** | **3.50** | **Spatial Locality** (Block Fetch) |
 | **Phase 2** | Repeated loop (4-block working set) | 40 | 36 | 4 | **0.900** | **0.100** | **2.00** | **Temporal Locality** (Set Retention) |
-| **Phase 3** | Pseudo-random 16-bit XOR-shift | 200 | 2 | 198 | **0.010** | **0.990** | **10.90** | **Low Locality** (Conflict Thrashing) |
+| **Phase 3** | Pseudo-random 32-bit xorshift (16-bit addr window) | 200 | 2 | 198 | **0.010** | **0.990** | **10.90** | **Low Locality** (Conflict Thrashing) |
 | **Overall** | Full Combined Test Suite | **304** | **86** | **218** | **0.283** | **0.717** | **8.17** | Comprehensive Workload Metric |
 
 ### C. Analysis and Discussion
@@ -172,7 +172,7 @@ The design was simulated using Icarus Verilog (`iverilog`) under a self-containe
    $$\text{AMAT} = 1 + (0.100 \times 10) = 2.00\text{ clock cycles}$$
 
 3. **Conflict Miss Sensitivity (Phase 3)**:
-   When memory references are generated across a 64 KB space via a 32-bit XOR-shift LFSR, the working set is $64\times$ larger than the 1 KB cache capacity. Direct mapping causes lines with identical index bits to repeatedly displace one another, yielding a 1.0% hit ratio and driving the AMAT to 10.90 cycles.
+   When memory references are generated across a 64 KB space via a 32-bit xorshift generator (addresses taken from the low 16 bits of state), the working set is $64\times$ larger than the 1 KB cache capacity. Direct mapping causes lines with identical index bits to repeatedly displace one another, yielding a 1.0% hit ratio and driving the AMAT to 10.90 cycles.
 
 ---
 
@@ -210,14 +210,14 @@ The synthesized DFF count aligns with the theoretical register audit:
 | :---: | :--- | :---: | :--- | :--- |
 | 1 | **Pushkar Jain** | `2024NST-PJ` | **System Architecture & Hardware RTL Lead** | • Formulated cache architectural parameterization and address slicing macros (`cache_defs.vh`).<br>• Designed and implemented the complete synthesizable RTL for `cache_controller.v`, including the 3-state controller FSM (`S_IDLE`, `S_COMPARE`, `S_ALLOCATE`).<br>• Designed the 22-bit tag comparator, address decoders, and word-selection multiplexers.<br>• Executed logic synthesis in Yosys and audited gate/register area against theoretical models.<br>• Authored the Proposed Solution, System Architecture, and Synthesis sections of the report. |
 | 2 | **Ved Pawar** | `2024NST-VP` | **Verification Lead & Backing Store Modeling** | • Designed and implemented the behavioral backing store memory model (`main_memory.v`) with multi-cycle latency handshake.<br>• Authored the initial testbench infrastructure (`tb_cache.v`) and signal declarations.<br>• Implemented real-time AMAT and hit/miss statistical computation tasks in simulation.<br>• Built the Python VCD waveform extraction script (`plot_wave.py`) for automated timing diagrams.<br>• Contributed to the Abstract, Literature Review, and Verification Analysis sections of the report. |
-| 3 | **Khuswant Rajpurohit** | `2024NST-KR` | **Benchmark Generation & Workload Analysis** | • Designed the memory access benchmark suites for spatial locality (sequential strides) and temporal locality (repeated working sets).<br>• Implemented the 32-bit Galois LFSR pseudo-random generator with XOR-shift permutations in the testbench.<br>• Analyzed performance trade-offs, cache line thrashing, and conflict miss behavior under unbuffered memory loads.<br>• Co-authored the Experimental Results, Discussion, and Performance Tables. |
+| 3 | **Khuswant Rajpurohit** | `2024NST-KR` | **Benchmark Generation & Workload Analysis** | • Designed the memory access benchmark suites for spatial locality (sequential strides) and temporal locality (repeated working sets).<br>• Implemented the 32-bit xorshift pseudo-random address generator (shift triplet 13/17/5) in the testbench.<br>• Analyzed performance trade-offs, cache line thrashing, and conflict miss behavior under unbuffered memory loads.<br>• Co-authored the Experimental Results, Discussion, and Performance Tables. |
 | 4 | **Anshu Yadav** | `2024NST-AY` | **Documentation, Build Automation & LaTeX Typesetting** | • Structured and formatted the IEEE conference paper specification (`CacheController_IEEE_Report.tex`).<br>• Configured the build runner script (`run.sh`) and simulation automation pipeline.<br>• Compiled and validated the IEEE final publication PDF (`CacheController_IEEE_Report.pdf`).<br>• Curated project references, compiled repository documentation, and formatted comparative architectural tables. |
 
 ---
 
 ## VI. Conclusion
 
-This paper presented the design, implementation, and verification of a synthesizable 1 KB direct-mapped cache controller in Verilog-2012. Simulation results quantitatively demonstrated how spatial and temporal locality yield hit ratios of 75.0% and 90.0%, achieving AMAT reductions from 10.90 cycles down to 3.50 and 2.00 cycles, respectively. Synthesis results verified clean timing boundaries and predictable register allocation. Potential future enhancements include adding write-through/write-back support with dirty-bit tracking, multi-way set associativity (2-way/4-way) with pseudo-LRU replacement, and non-blocking hit-under-miss memory pipelines.
+This paper presented the design, implementation, and verification of a synthesizable 1 KB direct-mapped cache controller in Verilog HDL. Simulation results quantitatively demonstrated how spatial and temporal locality yield hit ratios of 75.0% and 90.0%, achieving AMAT reductions from 10.90 cycles down to 3.50 and 2.00 cycles, respectively. Synthesis results verified clean timing boundaries and predictable register allocation. Potential future enhancements include adding write-through/write-back support with dirty-bit tracking, multi-way set associativity (2-way/4-way) with pseudo-LRU replacement, and non-blocking hit-under-miss memory pipelines.
 
 ---
 
