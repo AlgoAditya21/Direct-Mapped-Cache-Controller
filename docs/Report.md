@@ -12,6 +12,8 @@
 *Modern Computer Architecture Project, Newton School of Technology (NST)*  
 *Department of Computer Science & Engineering, Rishihood University, India*  
 
+**Project Report / Demo:** [Google Drive](https://drive.google.com/file/d/1PxN8rB5IDqUXvr27ozbz91nybHz0H0Vk/view?usp=drivesdk)
+
 ---
 
 ## Abstract
